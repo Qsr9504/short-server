@@ -22,3 +22,5 @@ docker rmi qsr9504/short-server:latest
 docker rmi qsr9504/short-server:1.0.0
 docker rmi ${server_name}
 rm -f mamba-short-server
+rm -f Dockerfile
+rm -f short-server
