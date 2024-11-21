@@ -1,16 +1,10 @@
 base:
-  website: 'http://localhost:7777'   # 域名 指向到该服务及其端口
-  port: '7777'  # 服务启动端口
+  website: 'http://192.168.5.8:7777'   # 域名 指向到该服务及其端口
+  port: '7779'  # 服务启动端口
   length: 8     # 短链接秘钥生成长度
   cacheTime: 60 # 内存缓存时间，分钟
 
 redis:
-  addr: 'localhost'   # 地址
+  addr: '192.168.5.8'   # 地址
   port: '6379'      # 端口号
   pwd:  'shatang'   # 密码
-
-
-# 获取短连接 请求
-
-
-# 获取某个短链的点击次数
