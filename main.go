@@ -51,7 +51,8 @@ func NewShortLinkService(baseURL string, redisAddr, redisPwd string) *ShortLinkS
 // Shorten handles long URL to short URL conversion
 func (s *ShortLinkService) Shorten(c *gin.Context) {
 	var req struct {
-		LongURL string `json:"long_url" binding:"required"`
+		LongURL   string `json:"long_url" binding:"required"`
+		DiyDomain string `json:"diy_domain"` // 自定义域名
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -69,8 +70,16 @@ func (s *ShortLinkService) Shorten(c *gin.Context) {
 	}
 	// 将 redis 数据 添加到内存
 	cacheMap.Set(shortCode, req.LongURL, time.Duration(conf.Base.CacheTime)*time.Minute)
+
+	resUrl := ""
+	if req.DiyDomain == "" {
+		resUrl = s.baseURL + "/" + shortCode
+	} else {
+		resUrl = req.DiyDomain + "/" + shortCode
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"short_url": s.baseURL + "/" + shortCode,
+		"short_url": resUrl,
 	})
 }
 

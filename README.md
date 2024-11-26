@@ -28,7 +28,7 @@ docker pull qsr9504/short-server:latest
 
 docker 启动命令
 ```bash
-docker run --name shortlink-server --restart=always -v ${你自己的配置文件路径}/config.yaml:/app/config.yaml -p 7777:7777 qsr9504/short-server:latest
+docker run -d --name shortlink-server --restart=always -v ${你自己的配置文件路径}/config.yaml:/app/config.yaml -p 7777:7777 qsr9504/short-server:latest
 ```
 
 配置文件模版文件
