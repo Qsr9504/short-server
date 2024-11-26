@@ -10,6 +10,7 @@ import (
 	"jason-short-server/tools"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -98,6 +99,17 @@ func (s *ShortLinkService) Redirect(c *gin.Context) {
 		// 将 redis 数据 添加到内存
 		cacheMap.Set(shortCode, longURL, time.Duration(conf.Base.CacheTime)*time.Minute)
 	}
+
+	// 获取传递的 URL 参数
+	queryParams := c.Request.URL.RawQuery
+	if queryParams != "" {
+		if strings.Contains(longURL, "?") {
+			longURL = longURL + "&" + queryParams
+		} else {
+			longURL = longURL + "?" + queryParams
+		}
+	}
+
 	// Increment visit count
 	_ = s.redisClient.Incr(ctx, fmt.Sprintf("short:stats:%s", shortCode)).Err()
 
