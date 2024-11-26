@@ -49,6 +49,10 @@ func NewShortLinkService(baseURL string, redisAddr, redisPwd string) *ShortLinkS
 	}
 }
 
+func (s *ShortLinkService) Healthy(c *gin.Context) {
+	c.JSON(http.StatusOK, "ok")
+}
+
 // Shorten handles long URL to short URL conversion
 func (s *ShortLinkService) Shorten(c *gin.Context) {
 	var req struct {
@@ -178,6 +182,7 @@ func main() {
 	r := gin.Default()
 	service := NewShortLinkService(conf.Base.Website, fmt.Sprintf("%v:%v", conf.Redis.Addr, conf.Redis.Port), conf.Redis.Pwd)
 
+	r.GET("/healthy", service.Healthy)
 	r.POST("/shorten", service.Shorten)
 	r.GET("/:shortCode", service.Redirect)
 	r.GET("/stats/:shortCode", service.Stats)
