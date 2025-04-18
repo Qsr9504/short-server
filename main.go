@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
@@ -54,27 +56,35 @@ func (s *ShortLinkService) Healthy(c *gin.Context) {
 }
 
 // Shorten handles long URL to short URL conversion
-func (s *ShortLinkService) Shorten(c *gin.Context) {
+func (s *ShortLinkService) Shorten(ctx *gin.Context) {
 	var req struct {
 		LongURL   string `json:"long_url" binding:"required"`
 		DiyDomain string `json:"diy_domain"` // 自定义域名
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	shortCode := generateShortCode(conf.Base.Length)
-	ctx := context.Background()
-
-	// Store the mapping in Redis
-	err := s.redisClient.Set(ctx, fmt.Sprintf("short:short:%s", shortCode), req.LongURL, redis.KeepTTL).Err()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save short URL"})
-		return
+	shortCode, isNewCode := s.generateShortCode(ctx, req.LongURL, conf.Base.Length)
+	if isNewCode {
+		// Store the mapping in Redis
+		err := s.redisClient.Set(ctx, fmt.Sprintf("short:short:%s", shortCode), req.LongURL, redis.KeepTTL).Err()
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save short URL 1"})
+			return
+		}
+		// 将 redis 数据 添加到内存
+		cacheMap.Set(shortCode, req.LongURL, time.Duration(conf.Base.CacheTime)*time.Minute)
+		// 再 存储到 集合中
+		err = s.redisClient.HSet(ctx, fmt.Sprintf("short:link"), req.LongURL).Err()
+		if err != nil {
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save short URL 2"})
+				return
+			}
+		}
 	}
-	// 将 redis 数据 添加到内存
-	cacheMap.Set(shortCode, req.LongURL, time.Duration(conf.Base.CacheTime)*time.Minute)
 
 	resUrl := ""
 	if req.DiyDomain == "" {
@@ -83,7 +93,7 @@ func (s *ShortLinkService) Shorten(c *gin.Context) {
 		resUrl = req.DiyDomain + "/" + shortCode
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	ctx.JSON(http.StatusOK, gin.H{
 		"short_url": resUrl,
 	})
 }
@@ -151,9 +161,25 @@ func (s *ShortLinkService) Stats(c *gin.Context) {
 	})
 }
 
+// longUrl 原始字符串
+// return 1: 码
+// return 2: 是否是 新生成的 code
 // creates a unique short code
-func generateShortCode(count int) string {
-	return uuid.New().String()[:count] // Use the first 8 characters of a UUID
+func (s *ShortLinkService) generateShortCode(ctx context.Context, longUrl string, count int) (string, bool) {
+	code := uuid.New().String()[:count] // Use the first 8 characters of a UUID
+	// 判断是否已经存在过了这个短链，就不再继续生成
+	result, err := s.redisClient.HGet(ctx, fmt.Sprintf("short:link"), s.md5(longUrl)).Result()
+	if err != nil {
+		return code, true
+	}
+	code = result
+	return code, false
+}
+
+func (s *ShortLinkService) md5(longUrl string) string {
+	hash := md5.Sum([]byte(longUrl))
+	md5Str1 := hex.EncodeToString(hash[:])
+	return strings.ToLower(md5Str1)
 }
 
 // 初始化配置信息
